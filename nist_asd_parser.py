@@ -1,19 +1,19 @@
+from __future__ import print_function
 
-try:
+import re, os, pickle, pathlib, time, sys
+
+if sys.version_info[0] < 3:
     import urllib2 as urllib
-except:
+else:
     import urllib
 
-try:
+if sys.version_info[0] < 3:
     import HTMLParser
-except ImportError:
+else:
     import html.parser as HTMLParser
-
-import re, os, pickle, pathlib, time
 
 from traits.api import Str, Float, Int, Instance, Button, List, HasTraits
 from traitsui.api import View, HGroup, VGroup, Item, UItem
-from logzero import logger
 
 import pylab as pl
 import numpy as np
@@ -59,8 +59,6 @@ class NISTASD(object):
 
         self.get_asd()
         self.parse_asd()
-        # self.plot()
-
 
     def get_asd(self):
         spec = self.spec
@@ -127,8 +125,6 @@ class NISTASD(object):
         except:
             self.nist_read = urllib.urlopen(self.full_URL).readlines()
 
-        # print(self.nist_read)
-
         # select lines between <pre> tags as the asd_lines table
         self.asd_lines = []
         found_pre = False
@@ -137,7 +133,6 @@ class NISTASD(object):
                 found_pre = not found_pre
                 continue
             if found_pre:
-                #self.asd_lines.append(ln)
                 # convert ISO-8859-1 to ASCII or UTF-8 or unicode or something...
                 self.asd_lines.append(HTMLParser.HTMLParser().unescape(ln.decode('utf-8')) )
         if self.asd_lines == []:
@@ -158,9 +153,9 @@ class NISTASD(object):
 
     def parse_section(self,asd,isec = 0):
         # first do the header
-        asd.pop(0) # first line is a break...
+        asd.pop(0)  # first line is a break...
         hd0 = [l.strip() for l in re.split(   '\|', asd[0])]
-        hd0.pop() # last value is a line break
+        hd0.pop()  # last value is a line break
         idx = [i.start() for i in re.finditer('\|', asd[0])] # indices for the dividers
         idx.insert(0,0)
 
@@ -182,20 +177,17 @@ class NISTASD(object):
                 lvs = [l.strip() for l in asd[0][ idx[i]+1 : idx[i+1] ].split('|')]
                 [hd.append(hd0[i] + ' ' + l) for l in lvs]
         hd = [h.strip() for h in hd]
-        #print hd
-
         self.header.append(hd)
 
         # to identify if the first element is the Spectrum or not...
         ls = 1 if hd[0] == 'Spectrum' else 0
 
         # now parse associated data
-        asd.pop(0) # first line is a break...
+        asd.pop(0)  # first line is a break...
         asd.pop(0)
 
         nan=float('nan')
         while re.search('-'*172, asd[0]) == None:
-            #print asd[0]
             l = [ l.strip() for l in re.split('\|', asd[0]) ]
 
             if l[0+ls] != '' or l[1+ls] != '':
@@ -213,10 +205,8 @@ class NISTASD(object):
                 gigk = l[12+ls].split('-') if l[12+ls] != '' else [nan, nan]
                 
                 # parse all fields into the dictionary
-                # print("re.sub('[^0-9\.]','',ri) = ",re.sub('[^0-9\.]','',ri),".")
                 try:
                     rel_int = float(re.sub('[^0-9\.]', '', ri)) if ri != '' else nan  # non-numerics seen: \(\)
-                    print("rel_int = ", rel_int)
                 except ValueError:
                     print(self.__class__.__name__, ": Could not convert -",re.sub('[^0-9\.]', '', ri), "- to float.")
                     rel_int = nan
@@ -269,12 +259,14 @@ class NISTLines(HasTraits):
 
     def _print_information_btn_fired(self):
         import pprint
-        if len(self.lines) == 0:
+        if len(self.lines) == 0 or self.spec not in self.lines[0]['spec']:
             self.get_lines()
 
         for line in self.lines:
-            pprint.pprint(line, width=1)
-            print()
+            wl = line['wave']
+            if wl > self.lowwl and wl < self.uppwl:
+                pprint.pprint(line, width=1)
+                print()
 
     def _spec_changed(self):
         print("NISTLines: Deleted nistasd_obj for new spectrum")
@@ -282,7 +274,6 @@ class NISTLines(HasTraits):
 
     @timeit
     def get_lines(self):
-
         print("pathlib.Path(__file__).resolve().parent = ", pathlib.Path(__file__).resolve().parent)
 
         direc = str(pathlib.Path(__file__).resolve().parent) + '/NIST_data/'
@@ -299,16 +290,13 @@ class NISTLines(HasTraits):
                 print(self.__class__.__name__, ": found spectrum in ", direc)
                 self.nistasd_obj = pickle.load(open(direc + filename, 'rb'))
 
-        # if self.nistasd_obj is None:
-        #     self.nistasd_obj = NISTASD(self.spec, self.lowwl, self.uppwl, self.order)
-
         self.lines = self.nistasd_obj.lines
         return self.lines
 
     def plot_nist_lines_to_axis(self, axis, normalize_max=None, legend=True):
-        if len(self.lines) == 0:
+        if len(self.lines) == 0 or self.spec not in self.lines[0]['spec']:
             self.get_lines()
-        
+
         print(self.__class__.__name__, ": Plotting NIST lines")
         specs = np.array(list(set([l['spec'] for l in self.lines])))
         specs.sort()
@@ -353,7 +341,7 @@ class NISTLines(HasTraits):
         return maxi
 
     def plot_lines(self):
-        if len(self.lines) == 0:
+        if len(self.lines) == 0 or self.spec not in self.lines[0]['spec']:
             self.get_lines()
         plt.figure()
         plt.grid()
