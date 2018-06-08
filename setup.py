@@ -21,8 +21,6 @@ setup(name='nist-asd',
         'HTMLParser',
         'pprint',
         'logzero',
-        'numpy',
-        'matplotlib',
         'mpldatacursor',
         'pathlib'
        ],
