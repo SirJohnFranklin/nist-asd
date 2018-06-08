@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='nist-asd',
-      version='1.1',
+      version='1.2',
       description='Basically a class which parses the NIST Atomic Spectra Database and saves the data to a dictionary '
                   'on HDD. You can pass an matplotlib.axis, and the emissions lines will be plotted with an optional '
                   'normalization factor.',
@@ -19,8 +19,6 @@ setup(name='nist-asd',
       ),
       install_requires=[
         'HTMLParser',
-        'traits',
-        'traitsui',
         'pprint',
         'logzero',
         'numpy',
