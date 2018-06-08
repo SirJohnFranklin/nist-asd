@@ -292,6 +292,16 @@ class NISTLines(object):
         self.lines = self.nistasd_obj.lines
         return self.lines
 
+    def get_lines_wavelength_range(self):
+        lines = []
+        for line in self.lines:
+            wl = line['wave']
+            if wl > self.lower_wavelength and wl < self.upper_wavelength:
+                lines.append(line)
+                
+                
+        return line
+
     def plot_nist_lines_to_axis(self, axis, normalize_max=None, legend=True):
         if self._check_download_conditions():
             self.get_lines()
