@@ -8,6 +8,8 @@ Basically a class which parses the NIST Atomic Spectra Database and saves the da
 Example usage:
 
 ```python
+>>> pip install nist-asd
+
 from nist_asd import NISTLines
 import matplotlib.pyplot as plt
 
