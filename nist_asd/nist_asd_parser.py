@@ -274,7 +274,8 @@ class NISTLines(object):
 
     @timeit
     def get_lines(self):
-        direc = str(pathlib.Path(__file__).resolve().parent) + '/NIST_data/'
+        # direc = str(pathlib.Path(__file__).resolve().parent) + '/NIST_data/'
+        direc = os.path.expanduser("~") + '/nist-asd/'
 
         filename = 'nist_data_' + self.spectrum + '.pkl'
         print(self.__class__.__name__, ": searching for saved spectrum in ", direc)

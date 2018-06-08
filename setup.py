@@ -26,5 +26,6 @@ setup(name='nist-asd',
         'numpy',
         'matplotlib',
         'mpldatacursor',
+        'pathlib'
        ],
 )
