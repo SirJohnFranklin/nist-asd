@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-__version__ = '1.1'
+__version__ = '1.0'
 
 from .nist_asd_parser import NISTLines, NISTASD
 __all__ = ['nist_asd_parser', 'NISTLines', 'NISTASD', 'HighlightingDataCursor']
