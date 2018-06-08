@@ -1,7 +1,7 @@
 # nist-asd
 Basically a class which parses the NIST Atomic Spectra Database and saves the data to a dictionary on HDD. 
 
-- You can pass an matplotlib.axis, and the emissions lines will be plotted with an optional normalization factor
+- You can pass a matplotlib.axis, and the emission lines will be plotted with an optional normalization factor
 - You can plot the data directly
 - You can print the atomic data and access it
 
