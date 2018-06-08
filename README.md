@@ -40,6 +40,9 @@ if __name__ == '__main__':
 ```
 
 Results in:
+[Plot result](examples/nist-asd-example-plot.pdf)
+
+
 ```
 NISTLines : searching for saved spectrum in nist_asd/NIST_data/
 NISTLines : found spectrum in ist_asd/NIST_data/
