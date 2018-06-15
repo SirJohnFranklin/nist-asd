@@ -1,7 +1,19 @@
-from nistasd import NISTLines
+from nistasd import NISTLines, NISTASD
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
+    import pandas as pd
+    
+    nist = NISTLines(spectrum='N')
+    energy_levels = nist.get_energy_levels()
+    
+    for ion_stage in energy_levels:
+        print("Number of energy levels: {0} for {1}".format(len(energy_levels[ion_stage]), ion_stage))
+        df = pd.DataFrame(energy_levels[ion_stage])
+        print(df)
+        
+        break
+    
     nist = NISTLines(spectrum='O', lower_wavelength=2., upper_wavelength=50., order=1)
 
     # plotting to existing axis with scaling parameter
@@ -13,10 +25,10 @@ if __name__ == '__main__':
     # plotting lines to new window
     nist.plot_lines()
     plt.savefig('nist-asd-example-plot.pdf')
-    plt.show()
+
 
     # printing information
-    nist = NISTLines(spectrum='O', lower_wavelength=17.20, upper_wavelength=17.35, order=1)
+    nist = NISTLines(spectrum='O', lower_wavelength=17.20, upper_wavelength=17.3, order=1)
     lines = nist.get_lines()
     print("Number of lines: ", len(lines))
     
@@ -25,3 +37,5 @@ if __name__ == '__main__':
     
     print("Line data within range:")
     nist.pprint()
+    
+    plt.show()

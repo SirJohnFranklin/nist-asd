@@ -26,28 +26,6 @@ from bs4 import BeautifulSoup
 __author__ = 'd.wilson'
 
 
-def timeit(f):
-    """
-    use: @timeit to time functions...
-    """
-    def timed(*args, **kw):
-
-        ts = time.time()
-        result = f(*args, **kw)
-        te = time.time()
-
-        diff = te-ts
-        unit = 'sec'
-        if diff < 1:
-            diff *= 1000.
-            unit = ' msec'
-
-        print('func:%r took: %2.4f %s' %(f.__name__, diff, unit))
-        return result
-
-    return timed
-
-
 class NISTASD(object):
     # Taken from: http://intermittentshorts.blogspot.de/2012/12/nist-atomic-spectral-database-parser.html and modified.
     def __init__(self, spec='H', lowwl=0.1, uppwl=1000., order=1):
@@ -277,7 +255,7 @@ class NISTLines(object):
                 pprint.pprint(line, width=1)
                 print()
 
-    @timeit
+    # @timeit
     def get_lines(self):
         # direc = str(pathlib.Path(__file__).resolve().parent) + '/NIST_data/'
         direc = os.path.expanduser("~") + '/.nist-asd/'
@@ -348,7 +326,7 @@ class NISTLines(object):
 
         if legend:
             if len(specs) > 1:
-                axis.legend(lines_spec, specs, loc=0)
+                axis.legend(handles=lines_spec, labels=specs, loc=0)
 
     def _get_maximum_relative_intensity(self):
         maxi = 0
