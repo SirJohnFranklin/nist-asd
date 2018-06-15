@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import re, os, pickle, time, sys, logzero, logging
-logzero.loglevel(logging.WARNING)
+# logzero.loglevel(logging.WARNING)
 
 if sys.version_info[0] < 3:
     import urllib2 as urllib
@@ -472,12 +472,17 @@ class NISTLines(object):
                         data['J'] = int(clean_str.strip())
                 
             if i == 4:
-                refind = float(re.findall(r"\d+\.\d+", clean_str)[0])
-                data['level (eV)'] = refind
+                clean_str = clean_str.strip().replace(' ', '')
+                
+                refind1 = re.findall(r"\d+\.\d+", clean_str.replace(' ', ''))
+                if type(refind1) == float:
+                    data['level (eV)'] = refind1
+                else:
+                    data['level (eV)'] = float(re.findall(r"\d+", clean_str.replace(' ', ''))[0])
             
-            if i == 5: data['uncertainty (eV)'] = float(clean_str)
+            if i == 5: data['uncertainty (eV)'] = float(clean_str.replace(' ', ''))
             
-            if i == 6: data['level splittings (eV)'] = float(clean_str)
+            if i == 6: data['level splittings (eV)'] = float(clean_str.replace(' ', ''))
             
             try:
                 if i == 7: data['leading percentages'] = float(clean_str)
@@ -486,6 +491,8 @@ class NISTLines(object):
 
         if 'configuration' not in data:
             data['configuration'] = ''
+            
+        if 'term' not in data:
             data['term'] = ''
         
         if data['configuration'] == '':  #
@@ -500,7 +507,7 @@ class NISTLines(object):
 if __name__ == '__main__':
     # Example 0
     import pandas as pd
-    nist = NISTLines(spectrum='N')
+    nist = NISTLines(spectrum='Xe')
     energy_levels = nist.get_energy_levels()
     
     for ion_stage in energy_levels:

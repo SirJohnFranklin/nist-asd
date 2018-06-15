@@ -14,7 +14,7 @@ setup(name='nist-asd',
       author='SirJohnFranklin',
       author_email='sirjfu@gmail.com',
       license='MIT',
-      packages=['nist-asd'],
+      packages=['nistasd'],
       zip_safe=False,
       classifiers=(
           "Programming Language :: Python :: 3",
