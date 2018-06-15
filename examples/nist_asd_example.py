@@ -1,4 +1,4 @@
-from nist_asd import NISTLines
+from nistasd import NISTLines
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':

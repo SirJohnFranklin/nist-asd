@@ -1,6 +1,7 @@
 from __future__ import print_function
 
-import re, os, pickle, pathlib, time, sys
+import re, os, pickle, time, sys, logzero, logging
+logzero.loglevel(logging.WARNING)
 
 if sys.version_info[0] < 3:
     import urllib2 as urllib
@@ -19,6 +20,7 @@ from mpldatacursor import datacursor
 from logzero import logger
 from copy import copy
 from math import isnan
+from bs4 import BeautifulSoup
 
 
 __author__ = 'd.wilson'
@@ -123,7 +125,7 @@ class NISTASD(object):
             try:
                 self.nist_read = urllib.urlopen(self.full_URL).readlines()
             except AttributeError:
-                print("")
+                logger.error("Was not able to download NIST spectra data. ")
 
         # select lines between <pre> tags as the asd_lines table
         self.asd_lines = []
@@ -148,10 +150,10 @@ class NISTASD(object):
 
         while len(asd) > 2:
             isec += 1
-            self.parse_section(asd,isec)
+            self.parse_section(asd, isec)
 
 
-    def parse_section(self,asd,isec = 0):
+    def parse_section(self, asd, isec = 0):
         # first do the header
         asd.pop(0)  # first line is a break...
         hd0 = [l.strip() for l in re.split(   '\|', asd[0])]
@@ -208,7 +210,7 @@ class NISTASD(object):
                 try:
                     rel_int = float(re.sub('[^0-9\.]', '', ri)) if ri != '' else nan  # non-numerics seen: \(\)
                 except ValueError:
-                    print(self.__class__.__name__, ": Could not convert -",re.sub('[^0-9\.]', '', ri), "- to float.")
+                    logger.warning("Could not convert -{0}- to float".format(re.sub('[^0-9\.]', '', ri)))
                     rel_int = nan
                 d = {'spectrum'      : l[0] if ls==1 else self.spec,
                      'wave_obs'  : float( re.sub('[^0-9\.]','',l[0+ls]) ) if l[0+ls] != '' else nan,
@@ -243,14 +245,17 @@ class NISTASD(object):
 
 
 class NISTLines(object):
-    def __init__(self, spectrum='He', lower_wavelength=100, upper_wavelength=1000, order=1):
+    def __init__(self, spectrum='He', lower_wavelength=100., upper_wavelength=1000., order=1):
         super(NISTLines, self).__init__()
         self.spectrum = spectrum                    # Species
         self.lower_wavelength = lower_wavelength    # lower limit for get_lines()
         self.upper_wavelength = upper_wavelength    # upper limit for get_lines()
         self.order = order                          # wavelength scaling, 1 equals to nm as given by the NIST database
         self.lines = []                             # List of dictionaries with line information
+        self.energy_levels = {}                     # Dictionary with list of dictionaries with energy level information
+                                                    # for each ion stage
         self.nistasd_obj = None                     # data fetcher
+        
 
     def _check_download_conditions(self):
         if len(self.lines) == 0:  # no data loaded
@@ -275,31 +280,33 @@ class NISTLines(object):
     @timeit
     def get_lines(self):
         # direc = str(pathlib.Path(__file__).resolve().parent) + '/NIST_data/'
-        direc = os.path.expanduser("~") + '/nist-asd/'
+        direc = os.path.expanduser("~") + '/.nist-asd/'
 
-        filename = 'nist_data_' + self.spectrum + '.pkl'
-        print(self.__class__.__name__, ": searching for saved spectrum in ", direc)
+        filename = 'nist_lines_' + self.spectrum + '.pkl'
+        logger.info("Searching for saved spectrum in {0}".format(direc))
         if not os.path.isfile(direc + filename):
-            print(self.__class__.__name__, ": found no spectrum in ", direc, " for ", self.spectrum, ". Downloading spectra ...")
+            logger.info("Found no spectrum in {0} for {1}. Downloading spectra ...".format(direc, self.spectrum))
             tmp_nistasd = NISTASD(self.spectrum, 0.01, 10000., self.order)
             self.nistasd_obj = tmp_nistasd
             if not os.path.isdir(direc):
                 os.makedirs(direc)
-            pickle.dump(self.nistasd_obj, open(direc + filename, 'wb'), protocol=-1)
+            pickle.dump(self.nistasd_obj, open(direc + filename, 'wb'), protocol=2)  # python 2 compat
         else:
-            print(self.__class__.__name__, ": found spectrum in ", direc)
+            logger.info("Found spectrum in {0}".format(direc))
             self.nistasd_obj = pickle.load(open(direc + filename, 'rb'))
 
         self.lines = self.nistasd_obj.lines
         return self.lines
 
     def get_lines_wavelength_range(self):
+        if self._check_download_conditions():
+            self.get_lines()
+        
         lines = []
         for line in self.lines:
             wl = line['wave']
             if wl > self.lower_wavelength and wl < self.upper_wavelength:
                 lines.append(line)
-                
                 
         return line
 
@@ -307,7 +314,7 @@ class NISTLines(object):
         if self._check_download_conditions():
             self.get_lines()
 
-        print(self.__class__.__name__, ": Plotting NIST lines")
+        logger.info("Plotting NIST lines to {0}".format(axis))
         specs = np.array(list(set([l['spectrum'] for l in self.lines])))
         specs.sort()
 
@@ -332,9 +339,11 @@ class NISTLines(object):
 
                 assert len(ispc) == 1  # dont know if correct, but working
                 lines_spec[ispc[0]] = lines[-1]
-
         # datacursor(lines)
-        print(self.__class__.__name__, ": plotting ", len(lines), " lines of ", len(self.lines), " in total for ", self.spectrum, " from ", self.lower_wavelength, " to ", self.upper_wavelength, " nm")
+        logger.info("Plotting {0} lines of {1} in total for {2} from "
+                    "{3:2.3e} to {4:2.3e} nm".format(len(lines), len(self.lines), self.spectrum, self.lower_wavelength,
+                                                     self.upper_wavelength))
+        
         datacursor(lines, formatter='{x} nm'.format)
 
         if legend:
@@ -360,10 +369,172 @@ class NISTLines(object):
         plt.ylabel('relative intensity')
         self.plot_nist_lines_to_axis(plt.gca(), 1.)
 
+    def get_unique_entries(self):
+        if self._check_download_conditions():
+            self.get_lines()
+        
+        ion_spec = []  # e.g. O IV
+        for line in self.lines:
+            ion_spec.append(line['spectrum'])
+    
+        return np.unique(ion_spec)
+
+
+    def get_energy_levels(self, temp=23.27):
+        unique_notations = self.get_unique_entries()
+        logger.info("Found unique notations = {0}".format(unique_notations))
+        # spec = unique_notations[1]
+        
+        for spec in unique_notations:
+            direc = os.path.expanduser("~") + '/.nist-asd/'
+    
+            filename = 'nist_energylevels_' + spec + '.pkl'
+            logger.info("Searching for saved energy levels in {0}".format(direc))
+            if not os.path.isfile(direc + filename):
+                logger.info("Found no energy levels in {0} for {1}. Downloading energy levels ...".format(direc, self.spectrum))
+                self.energy_levels[spec] = self._parse_energy_levels(spec, temp)
+    
+                if not os.path.isdir(direc):
+                    os.makedirs(direc)
+                pickle.dump(self.energy_levels[spec], open(direc + filename, 'wb'), protocol=2)
+            else:
+                logger.info("Found energy levels in {0}".format(direc))
+                self.energy_levels[spec] = pickle.load(open(direc + filename, 'rb'))
+
+        return self.energy_levels
+    
+    def _parse_energy_levels(self, spec, temp):
+        # temp in eV for partition functions - to be implemented
+
+        logger.info('Downloading energy levels for {0}'.format(spec))
+    
+        # build the web request
+        nist_URL = 'http://physics.nist.gov/cgi-bin/ASD/energy1.pl'
+        post_data = ('biblio=on' + '&'
+                     + 'conf_out=on' + '&'
+                     + 'encodedlist=XXT2' + '&'
+                     + 'page_size=15' + '&'
+                     + 'format=0' + '&'
+                     + 'j_out=on' + '&'
+                     + 'lande_out=on' + '&'
+                     + 'level_out=on' + '&'
+                     + 'multiplet_ordered=1' + '&'
+                     + 'output=0' + '&'
+                     + 'perc_out=on' + '&'
+                     + 'spectrum=' + str(spec).replace(' ', '+') + '&'
+                     + 'splitting=1' + '&'
+                     + 'submit=Retrieve+Data' + '&'
+                     + 'temp=' + str(temp) + '&'
+                     + 'term_out=on' + '&'
+                     + 'unc_out=1' + '&'
+                     + 'units=1'
+                     )
+    
+        # issue wget to pull the data from nist and use sed to split off the desired info
+        #  -q 'quiet' suppresses wget messages
+        #  -O - directs results to standard output
+        full_URL = nist_URL + '?' + post_data  # This issues as a GET instead of POST, but it works ok anyway
+    
+        cmd = ('wget -q -O - \'' + full_URL + '\' '
+               + '| sed -n \'/<pre*/,/<\/pre>/p\' '  # select lines between <pre> tags
+               + '| sed \'/<*pre>/d\' '  # remove <pre> lines
+               + '| iconv -f ISO-8859-1 -t ASCII')  # convert the web encoding to something IDL can understand...
+        # '| sed \'/----*/d\'' # remove ---- lines
+    
+        logger.info("Tryling to request: {0}".format(full_URL))
+        try:
+            nist_read = urllib.request.urlopen(full_URL).read().decode('utf8')
+        except:
+            try:
+                nist_read = urllib.urlopen(full_URL).read().decode('utf8')
+            except AttributeError:
+                logger.warning("Failed to open NIST page.")
+
+        splitted1 = nist_read.split("""<tr class="bsl">\n""")
+        splitted1_cleared = [part for part in splitted1 if not part.count(" <td>&nbsp;</td>") > 4]
+        splitted1_cleared = splitted1_cleared[1:]  # delete first
+    
+        energy_levels = []
+        for i, line in enumerate(splitted1_cleared):
+            if i > 0:
+                parsed_data = self._parse_energy_level_section(line, energy_levels[-1])
+            else:
+                parsed_data = self._parse_energy_level_section(line)
+            
+            energy_levels.append(parsed_data)
+            
+        return energy_levels
+    
+     
+    @staticmethod
+    def _parse_energy_level_section(str, last_data=None):
+
+        data = {}
+        splitted_str = str.split('\n')
+        for i, line in enumerate(splitted_str):
+            clean_str = BeautifulSoup(line.strip(), "lxml").text
+            if sys.version_info[0] < 3:  # fuck python2 btw.
+                clean_str = clean_str.encode("utf-8")
+            
+            
+            if clean_str.strip() == '': continue
+            
+            if i == 0: data['configuration'] = clean_str.replace('\xa0', '')
+            
+            if i == 1: data['term'] = clean_str.replace('\xa0', '')
+            
+            if i == 3:
+                if ',' in clean_str:
+                    data['J'] = clean_str.strip()
+                else:
+                    resplit = re.split("a?\/a?", clean_str)
+                    if len(resplit) == 2:
+                        data['J'] = float(resplit[0].replace(' ', '')) / float(resplit[1])
+                    else:
+                        data['J'] = int(clean_str.strip())
+                
+            if i == 4:
+                refind = float(re.findall(r"\d+\.\d+", clean_str)[0])
+                data['level (eV)'] = refind
+            
+            if i == 5: data['uncertainty (eV)'] = float(clean_str)
+            
+            if i == 6: data['level splittings (eV)'] = float(clean_str)
+            
+            try:
+                if i == 7: data['leading percentages'] = float(clean_str)
+            except ValueError:  # leading percentage is not always there
+                if i == 7: data['reference'] = clean_str.replace('\xa0','')
+
+        if 'configuration' not in data:
+            data['configuration'] = ''
+            data['term'] = ''
+        
+        if data['configuration'] == '':  #
+            data['configuration'] = last_data['configuration']
+
+        if data['term'] == '':
+            data['term'] = last_data['term']
+        
+        return data
+
 
 if __name__ == '__main__':
+    # Example 0
+    import pandas as pd
+    nist = NISTLines(spectrum='N')
+    energy_levels = nist.get_energy_levels()
+    
+    for ion_stage in energy_levels:
+        print("Number of levels: {0} for {1}".format(len(energy_levels[ion_stage]), ion_stage))
+        df = pd.DataFrame(energy_levels[ion_stage])
+        print(df)
+        
+        break
+
+
     # Example 1
-    nist = NISTLines(spectrum='Xe', lower_wavelength=2, upper_wavelength=20, order=1)
+    nist = NISTLines(spectrum='Xe', lower_wavelength=17.25, upper_wavelength=17.35, order=1)
     nist.get_lines()
     nist.pprint()
 
@@ -379,4 +550,5 @@ if __name__ == '__main__':
     nist.plot_nist_lines_to_axis(ax)
     plt.grid()
     plt.show()
+
 
