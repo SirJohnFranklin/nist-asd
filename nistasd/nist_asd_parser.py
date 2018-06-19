@@ -326,7 +326,8 @@ class NISTLines(object):
 
         if legend:
             if len(specs) > 1:
-                axis.legend(handles=lines_spec, labels=specs, loc=0)
+                # axis.legend(handles=lines_spec, labels=specs, loc=0)
+                axis.legend(lines_spec, specs, loc=0)
 
     def _get_maximum_relative_intensity(self):
         maxi = 0
@@ -364,7 +365,7 @@ class NISTLines(object):
         # spec = unique_notations[1]
         
         for spec in unique_notations:
-            direc = os.path.expanduser("~") + '/.nist-asd/'
+            direc = os.path.expanduser("~") + '/.nistasd/'
     
             filename = 'nist_energylevels_' + spec + '.pkl'
             logger.info("Searching for saved energy levels in {0}".format(direc))
@@ -507,19 +508,17 @@ class NISTLines(object):
 if __name__ == '__main__':
     # Example 0
     import pandas as pd
-    nist = NISTLines(spectrum='Xe')
+    nist = NISTLines(spectrum='O')
     energy_levels = nist.get_energy_levels()
     
-    for ion_stage in energy_levels:
-        print("Number of levels: {0} for {1}".format(len(energy_levels[ion_stage]), ion_stage))
-        df = pd.DataFrame(energy_levels[ion_stage])
-        print(df)
-        
-        break
-
+    for i, ion_stage in enumerate(energy_levels):
+        if i == 5:
+            print("Number of levels: {0} for {1}".format(len(energy_levels[ion_stage]), ion_stage))
+            df = pd.DataFrame(energy_levels[ion_stage])
+            print(df)
 
     # Example 1
-    nist = NISTLines(spectrum='Xe', lower_wavelength=17.25, upper_wavelength=17.35, order=1)
+    nist = NISTLines(spectrum='O', lower_wavelength=17.25, upper_wavelength=17.35, order=1)
     nist.get_lines()
     nist.pprint()
 
