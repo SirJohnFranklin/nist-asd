@@ -359,7 +359,7 @@ class NISTLines(object):
         return np.unique(ion_spec)
 
 
-    def get_energy_levels(self, temp=23.27):
+    def get_energy_level_data(self, temp=23.27):
         unique_notations = self.get_unique_entries()
         logger.info("Found unique notations = {0}".format(unique_notations))
         # spec = unique_notations[1]
@@ -509,7 +509,7 @@ if __name__ == '__main__':
     # Example 0
     import pandas as pd
     nist = NISTLines(spectrum='O')
-    energy_levels = nist.get_energy_levels()
+    energy_levels = nist.get_energy_level_data()
     
     for i, ion_stage in enumerate(energy_levels):
         if i == 5:

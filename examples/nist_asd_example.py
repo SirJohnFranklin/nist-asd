@@ -5,7 +5,7 @@ if __name__ == '__main__':
     import pandas as pd
     
     nist = NISTLines(spectrum='N')
-    energy_levels = nist.get_energy_levels()
+    energy_levels = nist.get_energy_level_data()
     
     for ion_stage in energy_levels:
         print("Number of energy levels: {0} for {1}".format(len(energy_levels[ion_stage]), ion_stage))
