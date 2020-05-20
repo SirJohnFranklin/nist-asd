@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import re, os, pickle, time, sys, logzero, logging
+import re, os, pickle, time, sys, logzero, logging, roman, mendeleev
 # logzero.loglevel(logging.WARNING)
 
 if sys.version_info[0] < 3:
@@ -288,7 +288,7 @@ class NISTLines(object):
                 
         return line
 
-    def plot_nist_lines_to_axis(self, axis, normalize_max=None, legend=True):
+    def plot_nist_lines_to_axis(self, axis, normalize_max=None, legend=True, measure='Aki', alpha=0.5):  # measure='Aki'
         if self._check_download_conditions():
             self.get_lines()
 
@@ -296,7 +296,7 @@ class NISTLines(object):
         specs = np.array(list(set([l['spectrum'] for l in self.lines])))
         specs.sort()
 
-        maxi = self._get_maximum_relative_intensity()
+        maxi = self._get_maximum_relative_intensity(measure)
 
         lines = []
         lines_spec = list(np.zeros(len(specs)))
@@ -308,12 +308,12 @@ class NISTLines(object):
                 
                 self.colr = plt.cm.get_cmap('tab20c_r')(float(ispc)/len(specs))
 
-                if normalize_max == None:
-                    ri = float(self.lines[i]['rel_int']) / maxi
+                if normalize_max is None:
+                    ri = float(self.lines[i][measure])
                 else:
-                    ri = float(self.lines[i]['rel_int']) / maxi * normalize_max
+                    ri = float(self.lines[i][measure]) / maxi * normalize_max
 
-                lines.append(axis.plot([wl, wl], [0., ri if not isnan(ri) else 1.e-6], '.-', color=self.colr, alpha=.99)[0])
+                lines.append(axis.plot([wl, wl], [0., ri if not isnan(ri) else 1.e-6], '.-', lw=1., color=self.colr, alpha=alpha)[0])
 
                 assert len(ispc) == 1  # dont know if correct, but working
                 lines_spec[ispc[0]] = lines[-1]
@@ -329,13 +329,14 @@ class NISTLines(object):
                 # axis.legend(handles=lines_spec, labels=specs, loc=0)
                 axis.legend(lines_spec, specs, loc=0)
 
-    def _get_maximum_relative_intensity(self):
+    def _get_maximum_relative_intensity(self, measure):
         maxi = 0
         for i in range(len(self.lines)):
             wl = self.lines[i]['wave']
             if wl > self.lower_wavelength and wl < self.upper_wavelength:
-                if self.lines[i]['rel_int'] > maxi:
-                    maxi = self.lines[i]['rel_int']
+                # print("self.lines[i][measure] = ", self.lines[i].keys())
+                if float(self.lines[i][measure]) > maxi:
+                    maxi = self.lines[i][measure]
 
         return maxi
 
@@ -359,8 +360,13 @@ class NISTLines(object):
         return np.unique(ion_spec)
 
 
-    def get_energy_level_data(self, temp=23.27):
-        unique_notations = self.get_unique_entries()
+    def get_energy_level_data(self, temp=1.):
+        # unique_notations = self.get_unique_entries()
+        mendeleev_info = mendeleev.element(self.spectrum)
+        n_electrons = mendeleev_info.electrons
+
+        unique_notations = np.array([self.spectrum + ' ' + roman.toRoman(i) for i in range(1, n_electrons + 1)])
+        
         logger.info("Found unique notations = {0}".format(unique_notations))
         # spec = unique_notations[1]
         
@@ -380,7 +386,10 @@ class NISTLines(object):
                 logger.info("Found energy levels in {0}".format(direc))
                 self.energy_levels[spec] = pickle.load(open(direc + filename, 'rb'))
 
-        return self.energy_levels
+        if len(list(self.energy_levels.keys())) == 1:
+            return {'H I':self.energy_levels['H']}
+        else:
+            return self.energy_levels
     
     def _parse_energy_levels(self, spec, temp):
         # temp in eV for partition functions - to be implemented
@@ -420,7 +429,7 @@ class NISTLines(object):
                + '| iconv -f ISO-8859-1 -t ASCII')  # convert the web encoding to something IDL can understand...
         # '| sed \'/----*/d\'' # remove ---- lines
     
-        logger.info("Tryling to request: {0}".format(full_URL))
+        logger.info("Trying to request: {0}".format(full_URL))
         try:
             nist_read = urllib.request.urlopen(full_URL).read().decode('utf8')
         except:
@@ -463,25 +472,61 @@ class NISTLines(object):
             if i == 1: data['term'] = clean_str.replace('\xa0', '')
             
             if i == 3:
+                # print("i == 3 : ", clean_str)
+                if '?' in clean_str.strip():
+                    clean_str = clean_str.replace('?','')
+                
                 if ',' in clean_str:
-                    data['J'] = clean_str.strip()
+                    clean_str = clean_str.split(',')[0]
+                
+                if '/' in clean_str.strip():
+                    # resplit = re.split("a?\/a?", clean_str)
+                    # data['J'] = float(resplit[0].replace(' ', '')) / float(resplit[1])
+                    resplit = clean_str.strip().split('/')
+                    try:
+                        data['J'] = float(resplit[0]) / float(resplit[1])
+                    except ValueError:
+                        print("clean_str = ", clean_str)
+                        exit()
+                        
+                    # print("data['J'] = ", data['J'])
                 else:
-                    resplit = re.split("a?\/a?", clean_str)
-                    if len(resplit) == 2:
-                        data['J'] = float(resplit[0].replace(' ', '')) / float(resplit[1])
-                    else:
-                        data['J'] = int(clean_str.strip())
+                    try:
+                        data['J'] = float(clean_str.strip())
+                    except:
+                        logger.error("Could not read: {0}".format(clean_str.strip()))
+                        # if ',' in clean_str:
+                        #     data['J'] = clean_str.strip()
+                        # else:
+                        #     resplit = re.split("a?\/a?", clean_str)
+                        #     try:
+                        #         if len(resplit) == 2:
+                        #             data['J'] = float(resplit[0].replace(' ', '')) / float(resplit[1])
+                        #         else:
+                        #             data['J'] = int(clean_str.strip())
+                        #     except ValueError:
+                        #         logger.error("Could not read: {0}".format(clean_str.strip()))
                 
             if i == 4:
-                clean_str = clean_str.strip().replace(' ', '')
+                clean_str = clean_str.strip().replace(' ', '').replace('(','').replace(')','').replace('[','').replace(']','')
                 
                 refind1 = re.findall(r"\d+\.\d+", clean_str.replace(' ', ''))
+                
                 if type(refind1) == float:
                     data['level (eV)'] = refind1
+                elif len(refind1) == 1:
+                    # print("refind1 = ", refind1, " | clean_str = ", clean_str)
+                    data['level (eV)'] = float(refind1[0])
                 else:
-                    data['level (eV)'] = float(re.findall(r"\d+", clean_str.replace(' ', ''))[0])
+                    data['level (eV)'] = float(clean_str)
+
+                # print("refind1 = ", refind1, " | clean_str = ", clean_str, " | data['level (eV)'] = ",
+                #       data['level (eV)'])
             
-            if i == 5: data['uncertainty (eV)'] = float(clean_str.replace(' ', ''))
+            try:
+                if i == 5: data['uncertainty (eV)'] = float(clean_str.replace(' ', ''))
+            except ValueError:
+                logger.error("Could not read: {0}".format(clean_str.replace(' ', '')))
             
             if i == 6: data['level splittings (eV)'] = float(clean_str.replace(' ', ''))
             
@@ -518,13 +563,13 @@ if __name__ == '__main__':
             print(df)
 
     # Example 1
-    nist = NISTLines(spectrum='O', lower_wavelength=17.25, upper_wavelength=17.35, order=1)
+    nist = NISTLines(spectrum='Ar', lower_wavelength=17.25, upper_wavelength=17.35, order=1)
     nist.get_lines()
     nist.pprint()
 
     # Example 2
     nist = NISTLines()
-    nist.spectrum = 'Kr'
+    nist.spectrum = 'O'
     nist.lower_wavelength = 5.
     nist.upper_wavelength = 30.
 
