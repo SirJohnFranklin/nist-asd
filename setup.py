@@ -23,9 +23,10 @@ setup(name='nist-asd',
       ),
       install_requires=[
         'HTMLParser',
-        'pprint',
         'logzero',
         'mpldatacursor',
-        'pathlib'
+        'pathlib',
+        'roman',
+        'mendeleev'
        ],
 )
